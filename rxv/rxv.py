@@ -106,7 +106,9 @@ class RXV(object):
     def _discover_features(self):
         """Pull and parse the desc.xml so we can query it later."""
         try:
+            logger.debug("REQ: GET | {}".format(self.unit_desc_url))
             desc_xml = self._session.get(self.unit_desc_url).content
+            logger.debug("RES: GET | {} | {}".format(self.unit_desc_url, desc_xml))
             if not desc_xml:
                 logger.error(
                     "Unsupported Yamaha device? Failed to fetch {}".format(
@@ -146,11 +148,13 @@ class RXV(object):
 
         request_text = YamahaCommand.format(command=command, payload=payload)
         try:
+            logger.debug("REQ: POST | {} | {}".format(self.ctrl_url, request_text))
             res = self._session.post(
                 self.ctrl_url,
                 data=request_text,
                 headers={"Content-Type": "text/xml"}
             )
+            logger.debug("RES: POST | {} | {}".format(self.ctrl_url, res.content))
             # releases connection to the pool
             response = cElementTree.XML(res.content)
             if response.get("RC") != "0":
@@ -695,11 +699,8 @@ class RXV(object):
         # - or a triplet of (number, title, list(items)) if it is a container
         items = []
 
-        # track total line number because items associate only the display line number (per page)
-        # instead of the total line number
-        current_line = 0
         while True:
-            _, _, layer_name, _, max_line, current_list = self.menu_status()
+            _, _, layer_name, current_line, max_line, current_list = self.menu_status()
             assert len(path_to_layer) == 0 or layer_name == path_to_layer[-1][1]
 
             def effective_line_number(display_lineno):
@@ -709,7 +710,7 @@ class RXV(object):
                         display_lineno = display_lineno[5:]
                         display_lineno = int(display_lineno)
 
-                return current_line + display_lineno
+                return current_line + display_lineno - 1
 
             # add subitems by recursing into container items
             for lineno, container_name in current_list.containers.items():
@@ -734,8 +735,8 @@ class RXV(object):
 
             # update the current line number to figure out if we need to
             # jump to the next page
-            current_line += int(max(lines))
-            if current_line < max_line:
+            next_line = current_line + int(max(lines))
+            if next_line <= max_line:
                 # in this case, there are more pages with items available, so
                 # we have to jump to the next page
                 if self.menu_status().name != layer_name:
@@ -744,9 +745,8 @@ class RXV(object):
                     self._browse_to_target_layer(path_to_layer)
 
                 # jump to the next line to trigger a switch to the next page
-                next_lineno = current_line + 1
-                self.menu_jump_line(next_lineno)
-                self._wait_for_menu_status(lambda status: status.ready and status.current_line == next_lineno)
+                self.menu_jump_line(next_line)
+                self._wait_for_menu_status(lambda status: status.ready and status.current_line == next_line)
             else:
                 # in this case, there are no more pages so we can stop
                 break
