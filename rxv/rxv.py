@@ -14,7 +14,7 @@ from math import floor
 import requests
 from defusedxml import cElementTree
 
-from .exceptions import (MenuUnavailable, PlaybackUnavailable,
+from .exceptions import (MenuUnavailable, Timeout, PlaybackUnavailable,
                          ResponseException, UnknownPort)
 
 try:
@@ -44,6 +44,7 @@ class PlaybackSupport:
 
 BasicStatus = namedtuple("BasicStatus", "on volume mute input")
 PlayStatus = namedtuple("PlayStatus", "playing artist album song station")
+CurrentList = namedtuple("CurrentList", "all containers items unplayables unselectables")
 MenuStatus = namedtuple("MenuStatus", "ready layer name current_line max_line current_list")
 
 GetParam = 'GetParam'
@@ -189,9 +190,6 @@ class RXV(object):
         request_text = PowerControl.format(state=new_state)
         response = self._request('PUT', request_text)
         return response
-
-    def off(self):
-        return self.on(False)
 
     def get_playback_support(self, input_source=None):
         """Get playback support as bit vector.
@@ -503,12 +501,26 @@ class RXV(object):
         max_line = int(next(res.iter("Max_Line")).text)
         current_list = next(res.iter('Current_List'))
 
-        cl = {
-            elt.tag: elt.find('Txt').text
-            for elt in current_list.getchildren()
-            if elt.find('Attribute').text != 'Unselectable'
-        }
+        def _gather_with_attribute(predicate):
+            return {
+                elt.tag: elt.find('Txt').text
+                for elt in current_list
+                if predicate(elt.find('Attribute').text)
+            }
 
+        def _gather_items(attribute):
+            return _gather_with_attribute(lambda x: x == attribute)
+
+        def _gather_any():
+            return _gather_with_attribute(lambda x: True)
+
+        all = _gather_any()
+        containers = _gather_items('Container')
+        items = _gather_items('Item')
+        unplayables = _gather_items('Unplayable Item')
+        unselectables = _gather_items('Unselectable')
+
+        cl = CurrentList(all, containers, items, unplayables, unselectables)
         status = MenuStatus(ready, layer, name, current_line, max_line, cl)
         return status
 
@@ -553,6 +565,9 @@ class RXV(object):
 
     def menu_return(self):
         return self._menu_cursor("Return")
+
+    def menu_home(self):
+        return self._menu_cursor("Return to Home")
 
     @property
     def volume(self):
@@ -606,7 +621,213 @@ class RXV(object):
         response = self._request('PUT', request_text)
         return response
 
-    def _direct_sel(self, lineno):
+    @staticmethod
+    def _wait_for(predicate):
+        """Waits until the predicate returns True"""
+        if not predicate():
+            for attempt in range(10):
+                if predicate():
+                    break
+                time.sleep(0.1)
+            else:
+                raise Timeout()
+
+    def _wait_for_menu_status(self, predicate):
+        """Waits until the predicate returns True"""
+        self._wait_for(lambda: predicate(self.menu_status()))
+
+    def _wait_for_menu_ready(self):
+        """Waits until the menu reports ready status"""
+        self._wait_for(lambda: self.menu_status().ready)
+
+    def _server_sel_line(self, lineno):
+        """Selects the given line number in the menu"""
+        lineno = int(lineno)
+        self.menu_jump_line(lineno)
+        self._wait_for_menu_status(lambda status: status.ready and status.current_line == lineno)
+        self.menu_sel()
+        self._wait_for_menu_ready()
+
+    def server_paths(self):
+        """
+        Collects all SERVER paths that can  be used with server_select to play
+        specific content directly.
+
+        WARNING: This iterates through the menu to find all items and may be really slow!
+
+        :return: list(items)
+        """
+        return self._iter_menu([])
+
+    def _browse_to_target_layer(self, path_to_layer):
+        """
+        Browse to the layer specified by path_to_layer by selecting
+        the respective lines of the menu starting from the ROOT.
+
+        :param path_to_layer: list(pair(#, name))
+        """
+        self._wait_for_menu_ready()
+        self.menu_home()
+        self._wait_for_menu_status(lambda status: status.ready and status.layer == 1)
+
+        for lineno in [x[0] for x in path_to_layer]:
+            self.menu_jump_line(lineno)
+            self._wait_for_menu_status(lambda status: status.ready and status.current_line == lineno)
+            self.menu_sel()
+            self._wait_for_menu_ready()
+
+    def _iter_menu(self, path_to_layer):
+        """
+        Iterates through the menu items starting from the topmost
+        layer in the given path_to_layer. Returns a list of items.
+        One item has a number, title and an optinal list of subitems.
+        The list of subitems is only present for container items.
+
+        :param path_to_layer: list(pair(#, name))
+        :return: list(items)
+        """
+
+        # go to target layer
+        self._browse_to_target_layer(path_to_layer)
+
+        # list of items for the current layer, one item is either
+        # - a pair of (number, title) if it is not a container
+        # - or a triplet of (number, title, list(items)) if it is a container
+        items = []
+
+        # track total line number because items associate only the display line number (per page)
+        # instead of the total line number
+        current_line = 0
+        while True:
+            _, _, layer_name, _, max_line, current_list = self.menu_status()
+            assert len(path_to_layer) == 0 or layer_name == path_to_layer[-1][1]
+
+            def effective_line_number(display_lineno):
+                """Converts the displayed line number into the total line number"""
+                if isinstance(display_lineno, str):
+                    if display_lineno.startswith('Line'):
+                        display_lineno = display_lineno[5:]
+                        display_lineno = int(display_lineno)
+
+                return current_line + display_lineno
+
+            # add subitems by recursing into container items
+            for lineno, container_name in current_list.containers.items():
+                lineno = effective_line_number(lineno)
+                items.extend([(lineno, container_name, self._iter_menu(path_to_layer + [(lineno, container_name)]))])
+
+            # then add normal items (like songs)
+            if current_list.items.items():
+                items.extend([(effective_line_number(lineno), name) for lineno, name in current_list.items.items()])
+            # and unplayable items (like 'buttons' or other text)
+            if current_list.unplayables.items():
+                items.extend([(effective_line_number(lineno), name) for lineno, name in current_list.unplayables.items()])
+
+            def lineno_list(item_list):
+                return [int(x[5:]) for x in item_list]
+
+            lines = [0] + \
+                    lineno_list(current_list.containers.keys()) + \
+                    lineno_list(current_list.items.keys()) + \
+                    lineno_list(current_list.unplayables.keys()) + \
+                    lineno_list(current_list.unselectables.keys())
+
+            # update the current line number to figure out if we need to
+            # jump to the next page
+            current_line += int(max(lines))
+            if current_line < max_line:
+                # in this case, there are more pages with items available, so
+                # we have to jump to the next page
+                if self.menu_status().name != layer_name:
+                    # in case there were other containers we recursed into previously,
+                    # browse back to our original layer
+                    self._browse_to_target_layer(path_to_layer)
+
+                # jump to the next line to trigger a switch to the next page
+                next_lineno = current_line + 1
+                self.menu_jump_line(next_lineno)
+                self._wait_for_menu_status(lambda status: status.ready and status.current_line == next_lineno)
+            else:
+                # in this case, there are no more pages so we can stop
+                break
+
+        return items
+
+    def _server_select_num(self, indices):
+        """Selects the menu entries as given by the indices list in the order they are given"""
+        for index in indices:
+            self._server_sel_line(index)
+
+    def _server_select_name(self, layers):
+        """
+        Selects the menu entries as given by the layers list in the order they are given.
+
+        This method tries to find the corresponding list index by iterating through the menu
+        pages and matching the entry names to figure out the correct one. NOTE: this may be
+        a rather slow process! If you know the list index of the full patch already, use a
+        list of indices to select the content to be played instead.
+
+        NOTE: The layers list must start from the ROOT!
+
+        :param layers: list(str) List of menu entry names
+        """
+        for layer in layers:
+            menu = self.menu_status()
+            total_line_number = 0
+            while total_line_number < menu.max_line:
+                # there may be multiple pages with content, so we have to track the current lineno,
+                # the lineno in the menu is always bound by the display size, but we want to jump
+                # to the content directly with _server_sel_line
+                for line, value in menu.current_list.all.items():
+                    if value == layer:
+                        lineno = total_line_number + int(line[5:])
+                        self._server_sel_line(lineno)
+                        if menu.layer == len(layers):
+                            return
+                        break
+
+                total_line_number += len(menu.current_list.all.items())
+                if total_line_number < menu.max_line:
+                    self.menu_jump_line(total_line_number + 1)
+                    self._wait_for_menu_ready()
+                    menu = self.menu_status()
+                    self._wait_for_menu_ready()
+
+    def server_select(self, path):
+        """Play the specified path in SERVER mode.
+
+        This lets you play a SERVER address in a single command. Supports name based
+        lookup as well as index based lookup. The index can be queried with server_select(),
+        which returns all available SERVER paths. NOTE: name based lookup may be slow, so
+        prefer the index based lookup if you can.
+
+        Examples:
+            server_select('AVM FRITZ!Mediaserver>Internetradio>AlternativeFM>AlternativeFM Stream 2')
+            server_select([1, 4, 18, 1])
+
+        NOTE: The path must be given starting from the ROOT!
+
+        This method raises a Timeout exception if the menu doesn't behave as expected.
+
+        TODO: better error handling if we some how time out
+        """
+        self.input = "SERVER"
+
+        # go to the ROOT first
+        self._wait_for_menu_ready()
+        self.menu_home()
+        self._wait_for_menu_ready()
+
+        if isinstance(path, str):
+            layers = path.split(">")
+            self._server_select_name(layers)
+        elif isinstance(path, (list, set)):
+            layers = path
+            self._server_select_num(layers)
+        else:
+            raise NotImplementedError("Type {} is not supported".format(type(path)))
+
+    def _net_radio_direct_sel(self, lineno):
         request_text = SelectNetRadioLine.format(lineno=lineno)
         return self._request('PUT', request_text, zone_cmd=False)
 
@@ -631,10 +852,10 @@ class RXV(object):
         for attempt in range(20):
             menu = self.menu_status()
             if menu.ready:
-                for line, value in menu.current_list.items():
+                for line, value in menu.current_list.all.items():
                     if value == layers[menu.layer - 1]:
                         lineno = line[5:]
-                        self._direct_sel(lineno)
+                        self._net_radio_direct_sel(lineno)
                         if menu.layer == len(layers):
                             return
                         break

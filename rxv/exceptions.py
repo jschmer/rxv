@@ -20,6 +20,10 @@ class MenuUnavailable(RXVException):
     pass
 
 
+class Timeout(RXVException):
+    """Operation timed out"""
+    pass
+
 class PlaybackUnavailable(RXVException):
     """Raised when playback function called on unsupported source."""
     def __init__(self, source, action):
