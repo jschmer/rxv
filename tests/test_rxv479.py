@@ -2,7 +2,7 @@ import testtools
 import rxv
 import requests_mock
 import time
-from .menu_list_fakes import MenuListHandler
+from tests.menu_list_fakes import MenuListHandler
 
 FAKE_IP = '10.0.0.0'
 DESC_XML_URI = 'http://%s/YamahaRemoteControl/desc.xml' % FAKE_IP
@@ -91,7 +91,7 @@ class TestRXV479(testtools.TestCase):
         self.assertEqual((4, "Stream 17"), menu_list_handler.selected)
 
     @requests_mock.mock()
-    def test_server_select_incompatible(self, m):
+    def test_server_select_incompatible_input(self, m):
         menu_list_handler = MenuListHandler()
         m.add_matcher(lambda r: menu_list_handler.match(r))
 
@@ -103,3 +103,16 @@ class TestRXV479(testtools.TestCase):
         rec = rxv.RXV(FAKE_IP)
         self.assertRaises(NotImplementedError, rec.server_select, {1: "Hello"})
 
+
+    @requests_mock.mock()
+    def test_server_select_path_not_available(self, m):
+        menu_list_handler = MenuListHandler()
+        m.add_matcher(lambda r: menu_list_handler.match(r))
+
+        m.get(DESC_XML_URI, text=sample_content('rx-v479/desc.xml'))
+        m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel_Item>GetParam</Input_Sel_Item>'), text=sample_content('rx-v479/get_inputs.xml'))
+        m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>SERVER</Input_Sel>'), text=sample_content('rx-v479/set_input_SERVER.xml'))
+        m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>GetParam</Input_Sel>'), text=sample_content('rx-v479/get_current_input_SERVER.xml'))
+
+        rec = rxv.RXV(FAKE_IP)
+        self.assertRaises(FileNotFoundError, rec.server_select, "Fancy Server>Radio>Stream 66")

@@ -767,20 +767,29 @@ class RXV(object):
                 menu = self.menu_status()
                 self._wait_for_menu_ready()
 
-                for line, value in menu.current_list.all.items():
-                    if value == layer:
-                        lineno = menu.current_line + int(line[5:]) - 1
-                        self._server_sel_line(lineno)
-                        if menu.layer == len(layers):
-                            return
-                        break
+                def select_layer(layer):
+                    """
+                    Find and select the current layer in the menu
 
-                nextline = menu.current_line + len(menu.current_list.all.items())
-                if nextline <= menu.max_line:
-                    self.menu_jump_line(nextline)
-                    self._wait_for_menu_status(lambda status: status.ready and status.current_line == nextline)
-                else:
+                    :return: True if layer was found and selected, False otherwise
+                    """
+                    for line, value in menu.current_list.all.items():
+                        if value == layer:
+                            lineno = menu.current_line + int(line[5:]) - 1
+                            self._server_sel_line(lineno)
+                            return True
+                    return False
+
+                if select_layer(layer):
                     break
+                else:
+                    # layer not found, jump to next page if available
+                    nextline = menu.current_line + len(menu.current_list.all.items())
+                    if nextline <= menu.max_line:
+                        self.menu_jump_line(nextline)
+                        self._wait_for_menu_status(lambda status: status.ready and status.current_line == nextline)
+                    else:
+                        raise FileNotFoundError("Layer %s not found", layer)
 
     def server_select(self, path):
         """Play the specified path in SERVER mode.
