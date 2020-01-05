@@ -724,18 +724,9 @@ class RXV(object):
             if current_list.unplayables.items():
                 items.extend([(effective_line_number(lineno), name) for lineno, name in current_list.unplayables.items()])
 
-            def lineno_list(item_list):
-                return [int(x[5:]) for x in item_list]
-
-            lines = [0] + \
-                    lineno_list(current_list.containers.keys()) + \
-                    lineno_list(current_list.items.keys()) + \
-                    lineno_list(current_list.unplayables.keys()) + \
-                    lineno_list(current_list.unselectables.keys())
-
             # update the current line number to figure out if we need to
             # jump to the next page
-            next_line = current_line + int(max(lines))
+            next_line = current_line + len(current_list.all)
             if next_line <= max_line:
                 # in this case, there are more pages with items available, so
                 # we have to jump to the next page
@@ -772,26 +763,24 @@ class RXV(object):
         :param layers: list(str) List of menu entry names
         """
         for layer in layers:
-            menu = self.menu_status()
-            total_line_number = 0
-            while total_line_number < menu.max_line:
-                # there may be multiple pages with content, so we have to track the current lineno,
-                # the lineno in the menu is always bound by the display size, but we want to jump
-                # to the content directly with _server_sel_line
+            while True:
+                menu = self.menu_status()
+                self._wait_for_menu_ready()
+
                 for line, value in menu.current_list.all.items():
                     if value == layer:
-                        lineno = total_line_number + int(line[5:])
+                        lineno = menu.current_line + int(line[5:]) - 1
                         self._server_sel_line(lineno)
                         if menu.layer == len(layers):
                             return
                         break
 
-                total_line_number += len(menu.current_list.all.items())
-                if total_line_number < menu.max_line:
-                    self.menu_jump_line(total_line_number + 1)
-                    self._wait_for_menu_ready()
-                    menu = self.menu_status()
-                    self._wait_for_menu_ready()
+                nextline = menu.current_line + len(menu.current_list.all.items())
+                if nextline <= menu.max_line:
+                    self.menu_jump_line(nextline)
+                    self._wait_for_menu_status(lambda status: status.ready and status.current_line == nextline)
+                else:
+                    break
 
     def server_select(self, path):
         """Play the specified path in SERVER mode.
