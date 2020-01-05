@@ -36,6 +36,13 @@ class MenuListHandler:
               - Stream 3
               - Stream ...
               - Stream 20
+            - Some Fancy Song 1
+            - Some Fancy Song 2
+            - Some Fancy Song 3
+            - Some Fancy Song 4
+            - Some Fancy Song 5
+            - Some Fancy Song 6
+            - Some Fancy Song 7
           - Other Server
             - Nothing to see here (Unplayable Item)
         """
@@ -50,13 +57,16 @@ class MenuListHandler:
         # value = XML response
         self.responses = {
             (1, 'SERVER'): sample_content('rx-v479/get_SERVER_list_info_1_SERVER.xml'),
-            (2, 'Fancy Server'): sample_content('rx-v479/get_SERVER_list_info_2_1_FancyServer.xml'),
+            (2, 'Fancy Server'): {
+                range(1, 9): sample_content('rx-v479/get_SERVER_list_info_2_1_FancyServer_Page0.xml'),
+                range(9, 10): sample_content('rx-v479/get_SERVER_list_info_2_1_FancyServer_Page1.xml'),
+            },
             (2, 'Other Server'): sample_content('rx-v479/get_SERVER_list_info_2_2_OtherServer.xml'),
             (3, 'Music'): sample_content('rx-v479/get_SERVER_list_info_2_1_1_Music.xml'),
             (3, 'Radio'): {
-                1: sample_content('rx-v479/get_SERVER_list_info_2_1_2_Radio_Page0.xml'),
-                9: sample_content('rx-v479/get_SERVER_list_info_2_1_2_Radio_Page1.xml'),
-                17: sample_content('rx-v479/get_SERVER_list_info_2_1_2_Radio_Page2.xml'),
+                range(1, 9): sample_content('rx-v479/get_SERVER_list_info_2_1_2_Radio_Page0.xml'),
+                range(9, 17): sample_content('rx-v479/get_SERVER_list_info_2_1_2_Radio_Page1.xml'),
+                range(17, 25): sample_content('rx-v479/get_SERVER_list_info_2_1_2_Radio_Page2.xml'),
             },
             (4, 'Some Performer'): sample_content('rx-v479/get_SERVER_list_info_2_1_1_1_SomePerformer.xml'),
         }
@@ -68,7 +78,14 @@ class MenuListHandler:
             },
             (2, 'Fancy Server'): {
                 1: (3, 'Music'),
-                2: (3, 'Radio')
+                2: (3, 'Radio'),
+                3: (3, 'Some Fancy Song 1'),
+                4: (3, 'Some Fancy Song 2'),
+                5: (3, 'Some Fancy Song 3'),
+                6: (3, 'Some Fancy Song 4'),
+                7: (3, 'Some Fancy Song 5'),
+                8: (3, 'Some Fancy Song 6'),
+                9: (3, 'Some Fancy Song 7'),
             },
             (2, 'Other Server'): {
                 1: (3, 'Nothing to see here')
@@ -133,7 +150,15 @@ class MenuListHandler:
 
         response = self.responses[self.current]
         if isinstance(response, dict):
-            response = response[self.current_line]
+            def find_current_line_in_range():
+                nonlocal response
+                for r in response.keys():
+                    if self.current_line in r:
+                        return r
+                return None
+
+            resp_key = find_current_line_in_range()
+            response = response[resp_key]
         # replace <Current_Line>1</Current_Line> with the actual current line
         response = re.sub(
             r"<Current_Line>\d+</Current_Line>",
