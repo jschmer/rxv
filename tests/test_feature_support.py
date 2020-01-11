@@ -1,7 +1,9 @@
 from io import open
 
+from parameterized import parameterized
 import requests_mock
 import testtools
+import os
 
 import rxv
 
@@ -153,3 +155,15 @@ class TestFeaturesV675(testtools.TestCase):
         self.assertTrue(support.pause)
         self.assertTrue(support.skip_f)
         self.assertTrue(support.skip_r)
+
+
+DESC_XML_LIST = [x for x in os.listdir('tests/samples') if x.endswith('-desc.xml')]
+
+class TestSurroundPrograms(testtools.TestCase):
+    @parameterized.expand(DESC_XML_LIST)
+    def test_surround_programs_exist(self, desc_xml_file):
+        with requests_mock.mock() as m:
+            m.get(DESC_XML, text=sample_content(desc_xml_file))
+            rec = rxv.RXV(FAKE_IP)
+            programs = rec.surround_programs()
+            self.assertIn("Standard", programs)

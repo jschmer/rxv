@@ -22,7 +22,7 @@ class TestRXV479(testtools.TestCase):
 
     @requests_mock.mock()
     def test_basic_object(self, m):
-        m.get(DESC_XML_URI, text=sample_content('rx-v479/desc.xml'))
+        m.get(DESC_XML_URI, text=sample_content('rx-v479-desc.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Power>On</Power>'), text=sample_content('rx-v479/set_power_on.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Power>GetParam</Power>'), text=sample_content('rx-v479/get_power.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel_Item>GetParam</Input_Sel_Item>'), text=sample_content('rx-v479/get_inputs.xml'))
@@ -51,7 +51,7 @@ class TestRXV479(testtools.TestCase):
         menu_list_handler = MenuListHandler()
         m.add_matcher(lambda r: menu_list_handler.match(r))
 
-        m.get(DESC_XML_URI, text=sample_content('rx-v479/desc.xml'))
+        m.get(DESC_XML_URI, text=sample_content('rx-v479-desc.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>GetParam</Input_Sel>'), text=sample_content('rx-v479/get_current_input_SERVER.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel_Item>GetParam</Input_Sel_Item>'), text=sample_content('rx-v479/get_inputs.xml'))
 
@@ -65,7 +65,7 @@ class TestRXV479(testtools.TestCase):
         menu_list_handler = MenuListHandler()
         m.add_matcher(lambda r: menu_list_handler.match(r))
 
-        m.get(DESC_XML_URI, text=sample_content('rx-v479/desc.xml'))
+        m.get(DESC_XML_URI, text=sample_content('rx-v479-desc.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel_Item>GetParam</Input_Sel_Item>'), text=sample_content('rx-v479/get_inputs.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>SERVER</Input_Sel>'), text=sample_content('rx-v479/set_input_SERVER.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>GetParam</Input_Sel>'), text=sample_content('rx-v479/get_current_input_SERVER.xml'))
@@ -80,7 +80,7 @@ class TestRXV479(testtools.TestCase):
         menu_list_handler = MenuListHandler()
         m.add_matcher(lambda r: menu_list_handler.match(r))
 
-        m.get(DESC_XML_URI, text=sample_content('rx-v479/desc.xml'))
+        m.get(DESC_XML_URI, text=sample_content('rx-v479-desc.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel_Item>GetParam</Input_Sel_Item>'), text=sample_content('rx-v479/get_inputs.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>SERVER</Input_Sel>'), text=sample_content('rx-v479/set_input_SERVER.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>GetParam</Input_Sel>'), text=sample_content('rx-v479/get_current_input_SERVER.xml'))
@@ -95,7 +95,7 @@ class TestRXV479(testtools.TestCase):
         menu_list_handler = MenuListHandler()
         m.add_matcher(lambda r: menu_list_handler.match(r))
 
-        m.get(DESC_XML_URI, text=sample_content('rx-v479/desc.xml'))
+        m.get(DESC_XML_URI, text=sample_content('rx-v479-desc.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel_Item>GetParam</Input_Sel_Item>'), text=sample_content('rx-v479/get_inputs.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>SERVER</Input_Sel>'), text=sample_content('rx-v479/set_input_SERVER.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>GetParam</Input_Sel>'), text=sample_content('rx-v479/get_current_input_SERVER.xml'))
@@ -109,7 +109,7 @@ class TestRXV479(testtools.TestCase):
         menu_list_handler = MenuListHandler()
         m.add_matcher(lambda r: menu_list_handler.match(r))
 
-        m.get(DESC_XML_URI, text=sample_content('rx-v479/desc.xml'))
+        m.get(DESC_XML_URI, text=sample_content('rx-v479-desc.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel_Item>GetParam</Input_Sel_Item>'), text=sample_content('rx-v479/get_inputs.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>SERVER</Input_Sel>'), text=sample_content('rx-v479/set_input_SERVER.xml'))
         m.post(CTRL_URI, additional_matcher=lambda r: match_request(r, '<Input_Sel>GetParam</Input_Sel>'), text=sample_content('rx-v479/get_current_input_SERVER.xml'))
