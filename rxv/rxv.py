@@ -681,7 +681,7 @@ class RXV(object):
 
         WARNING: This iterates through the menu to find all items and may be really slow!
 
-        :return: list(items)
+        :return: list(strings)
         """
         return self._iter_menu([])
 
@@ -737,14 +737,15 @@ class RXV(object):
             # add subitems by recursing into container items
             for lineno, container_name in current_list.containers.items():
                 lineno = effective_line_number(lineno)
-                items.extend([(lineno, container_name, self._iter_menu(path_to_layer + [(lineno, container_name)]))])
+                children = self._iter_menu(path_to_layer + [(lineno, container_name)])
+                items.extend([("{}>{}".format(container_name, child), "{}>{}".format(lineno, index)) for child, index in children])
 
             # then add normal items (like songs)
             if current_list.items.items():
-                items.extend([(effective_line_number(lineno), name) for lineno, name in current_list.items.items()])
+                items.extend([(name, effective_line_number(lineno)) for lineno, name in current_list.items.items()])
             # and unplayable items (like 'buttons' or other text)
             if current_list.unplayables.items():
-                items.extend([(effective_line_number(lineno), name) for lineno, name in current_list.unplayables.items()])
+                items.extend([(name, effective_line_number(lineno)) for lineno, name in current_list.unplayables.items()])
 
             # update the current line number to figure out if we need to
             # jump to the next page

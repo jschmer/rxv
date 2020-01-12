@@ -57,7 +57,38 @@ class TestRXV479(testtools.TestCase):
 
         rec = rxv.RXV(FAKE_IP)
         actual = rec.server_paths()
-        expected = eval("[(1, 'Fancy Server', [(1, 'Music', [(1, 'Some Performer', [(1, 'Song Title 1'), (2, 'Song Title 2')])]), (2, 'Radio', [(1, 'Stream 1'), (2, 'Stream 2'), (3, 'Stream 3'), (4, 'Stream 4'), (5, 'Stream 5'), (6, 'Stream 6'), (7, 'Stream 7'), (8, 'Stream 8'), (9, 'Stream 9'), (10, 'Stream 10'), (11, 'Stream 11'), (12, 'Stream 12'), (13, 'Stream 13'), (14, 'Stream 14'), (15, 'Stream 15'), (16, 'Stream 16'), (17, 'Stream 17'), (18, 'Stream 18'), (19, 'Stream 19'), (20, 'Stream 20')]), (3, 'Some Fancy Song 1'), (4, 'Some Fancy Song 2'), (5, 'Some Fancy Song 3'), (6, 'Some Fancy Song 4'), (7, 'Some Fancy Song 5'), (8, 'Some Fancy Song 6'), (9, 'Some Fancy Song 7')]), (2, 'Other Server', [(1, 'Nothing to see here')])]")
+        expected = [
+            ("Fancy Server>Music>Some Performer>Song Title 1", "1>1>1>1"),
+            ("Fancy Server>Music>Some Performer>Song Title 2", "1>1>1>2"),
+            ("Fancy Server>Radio>Stream 1", "1>2>1"),
+            ("Fancy Server>Radio>Stream 2", "1>2>2"),
+            ("Fancy Server>Radio>Stream 3", "1>2>3"),
+            ("Fancy Server>Radio>Stream 4", "1>2>4"),
+            ("Fancy Server>Radio>Stream 5", "1>2>5"),
+            ("Fancy Server>Radio>Stream 6", "1>2>6"),
+            ("Fancy Server>Radio>Stream 7", "1>2>7"),
+            ("Fancy Server>Radio>Stream 8", "1>2>8"),
+            ("Fancy Server>Radio>Stream 9", "1>2>9"),
+            ("Fancy Server>Radio>Stream 10", "1>2>10"),
+            ("Fancy Server>Radio>Stream 11", "1>2>11"),
+            ("Fancy Server>Radio>Stream 12", "1>2>12"),
+            ("Fancy Server>Radio>Stream 13", "1>2>13"),
+            ("Fancy Server>Radio>Stream 14", "1>2>14"),
+            ("Fancy Server>Radio>Stream 15", "1>2>15"),
+            ("Fancy Server>Radio>Stream 16", "1>2>16"),
+            ("Fancy Server>Radio>Stream 17", "1>2>17"),
+            ("Fancy Server>Radio>Stream 18", "1>2>18"),
+            ("Fancy Server>Radio>Stream 19", "1>2>19"),
+            ("Fancy Server>Radio>Stream 20", "1>2>20"),
+            ("Fancy Server>Some Fancy Song 1", "1>3"),
+            ("Fancy Server>Some Fancy Song 2", "1>4"),
+            ("Fancy Server>Some Fancy Song 3", "1>5"),
+            ("Fancy Server>Some Fancy Song 4", "1>6"),
+            ("Fancy Server>Some Fancy Song 5", "1>7"),
+            ("Fancy Server>Some Fancy Song 6", "1>8"),
+            ("Fancy Server>Some Fancy Song 7", "1>9"),
+            ("Other Server>Nothing to see here", "2>1"),
+        ]
         self.assertEqual(expected, actual)
 
     @requests_mock.mock()
